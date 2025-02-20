@@ -641,14 +641,15 @@ const WifiAPTypeItem = (props) => {
 // 重启设备
 const WifiRebootItem = (props) => {
   const [dialogShow, setDialogShow] = useState(false);
+  const [loading, setLoading] = useState(false);
   const handleRebootDevice = async () => {
     setDialogShow(true);
   }
   const handleConfirm = async () => {
+    setLoading(true);
     try {
       const response = await sendRequest('POST', '/restart');
       console.log('返回的的数据:', response);
-      setDialogShow(false);
     } catch (error) {
       console.error('Error:', error);
     }
@@ -656,6 +657,7 @@ const WifiRebootItem = (props) => {
 
   const handleClose = () => {
     setDialogShow(false);
+    setLoading(false);
   }
 
   return (
@@ -671,8 +673,9 @@ const WifiRebootItem = (props) => {
         open={dialogShow}
         confirmButton
         cancelButton
+        loading={loading}
         title="Reboot"
-        content="Are you sure you want to reboot the device?" />
+        content={loading ? "The device is restarting. Please check the network status later. " : "Are you sure you want to reboot the device? "} />
     </>
   )
 }
@@ -933,7 +936,7 @@ const UploadFilesItem = (props) => {
   const [progress, setProgress] = useState(0);
   const [progressShow, setProgressShow] = useState(false);
   const [dialogShow, setDialogShow] = useState(false);
-
+  const [loading, setLoading] = useState(false);
   const handleSelectFile = (event) => {
     const files = event.target.files;
     if (files.length > 0) {
@@ -985,10 +988,10 @@ const UploadFilesItem = (props) => {
     }
   };
   const handleConfirm = async () => {
+    setLoading(true);
     try {
       const response = await sendRequest('POST', '/restart');
       console.log('返回的的数据:', response);
-      setDialogShow(false);
     } catch (error) {
       console.error('Error:', error);
     }
@@ -996,6 +999,7 @@ const UploadFilesItem = (props) => {
 
   const handleClose = () => {
     setDialogShow(false);
+    setLoading(false);
   }
 
   // 文件上传按钮组件
@@ -1061,11 +1065,15 @@ const UploadFilesItem = (props) => {
         open={dialogShow}
         confirmButton={!progressShow}
         cancelButton={!progressShow}
+        loading={loading}
         children={
           progressShow && <LinearProgressWithLabel value={progress} />
         }
         title="OTA"
-        content={!progressShow ? "File uploaded successfully, Are you sure you want to reboot the device?" : "OTA is currently upgrading. Please do not refresh the page, disconnect the power, or reset the device."} />
+        content={
+          !progressShow && !loading ? "File uploaded successfully, Are you sure you want to reboot the device?"
+            : (loading ? "The device is restarting. Please check the network status later." : "OTA is currently upgrading. Please do not refresh the page, disconnect the power, or reset the device.")
+        } />
     </>
   )
 }
@@ -1139,7 +1147,9 @@ const DialogBox = (props) => {
         <DialogActions>
           {
             props.confirmButton &&
-            <Button onClick={props.onConfirm}>Confirm</Button>
+            <Button onClick={props.onConfirm}>
+              {props.loading ? <CircularProgress color="inherit" size={20} /> : "Confirm"}
+            </Button>
           }
           {
             props.cancelButton &&
