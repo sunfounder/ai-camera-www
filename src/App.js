@@ -669,6 +669,8 @@ const WifiRebootItem = (props) => {
         onConfirm={handleConfirm}
         onClose={handleClose}
         open={dialogShow}
+        confirmButton
+        cancelButton
         title="Reboot"
         content="Are you sure you want to reboot the device?" />
     </>
@@ -950,6 +952,7 @@ const UploadFilesItem = (props) => {
   const handleUpload = (event) => {
     if (selectedFiles) {
       setProgressShow(true);
+      setDialogShow(true);
       let formData = new FormData();
       formData.append('update', selectedFiles);
       let xhr = new XMLHttpRequest();
@@ -958,13 +961,26 @@ const UploadFilesItem = (props) => {
         if (e.lengthComputable) {
           let progress = e.loaded / e.total * 100;
           setProgress(progress);
+          console.log('当前状态:', xhr.status);
           if (progress === 100 && xhr.status === 200) {
             setProgressShow(false);
             setSelectedFileName('Upload files');
-            setDialogShow(true);
           }
         }
       });
+
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          const responseData = JSON.parse(xhr.responseText);
+          console.log('响应数据:', responseData);
+          setProgressShow(false);
+          setSelectedFileName('Upload files');
+        } else {
+          console.error('上传失败:', xhr.statusText);
+        }
+      };
+
+
       xhr.send(formData);
     }
   };
@@ -1024,7 +1040,8 @@ const UploadFilesItem = (props) => {
       <Zoom in>
         <Fab
           variant={
-            progressShow ? "circular" : "extended"
+            // progressShow ? "circular" : "extended"
+            "extended"
           }
           color="primary"
           disabled={progressShow ? true : false}
@@ -1032,9 +1049,9 @@ const UploadFilesItem = (props) => {
           onClick={handleUpload}
         >
           {
-            progressShow ?
-              <CircularProgressWithLabel value={progress} size={64}></CircularProgressWithLabel> :
-              <><UpgradeIcon sx={{ mr: 1 }} />{selectedFiles ? "Update" : "Please select file"}</>
+            // progressShow ?
+            // <CircularProgressWithLabel value={progress} size={64}></CircularProgressWithLabel> :
+            <><UpgradeIcon sx={{ mr: 1 }} />{selectedFiles ? "Update" : "Please select file"}</>
           }
         </Fab>
       </Zoom>
@@ -1042,8 +1059,13 @@ const UploadFilesItem = (props) => {
         onConfirm={handleConfirm}
         onClose={handleClose}
         open={dialogShow}
-        title="Upload"
-        content="File uploaded successfully, Are you sure you want to reboot the device?" />
+        confirmButton={!progressShow}
+        cancelButton={!progressShow}
+        children={
+          progressShow && <LinearProgressWithLabel value={progress} />
+        }
+        title="OTA"
+        content={!progressShow ? "File uploaded successfully, Are you sure you want to reboot the device?" : "OTA is currently upgrading. Please do not refresh the page, disconnect the power, or reset the device."} />
     </>
   )
 }
@@ -1099,7 +1121,7 @@ const DialogBox = (props) => {
     <>
       <Dialog
         open={props.open}
-        onClose={props.onClose}
+        // onClose={props.onClose}
         aria-labelledby="alert-dialog-title"
         aria-describedby="alert-dialog-description"
       >
@@ -1110,13 +1132,38 @@ const DialogBox = (props) => {
           <DialogContentText id="alert-dialog-description">
             {props.content}
           </DialogContentText>
+          <Box sx={{ width: '100%', }}>
+            {props.children}
+          </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={props.onConfirm}>Confirm</Button>
-          <Button onClick={props.onClose} autoFocus>Close</Button>
+          {
+            props.confirmButton &&
+            <Button onClick={props.onConfirm}>Confirm</Button>
+          }
+          {
+            props.cancelButton &&
+            <Button onClick={props.onClose} autoFocus>Close</Button>
+          }
         </DialogActions>
       </Dialog>
     </>
+  );
+}
+
+const LinearProgressWithLabel = (props) => {
+  // 返回一个Box组件，包含两个子组件
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', marginTop: 2 }}>
+      <Box sx={{ width: '100%', mr: 1 }}>
+        <LinearProgress variant="determinate"  {...props} sx={{ height: '15px', borderRadius: '5px' }} />
+      </Box>
+      <Box sx={{ minWidth: 35 }}>
+        <Typography variant="body2" >
+          {`${Math.round(props.value)}%`}
+        </Typography>
+      </Box>
+    </Box>
   );
 }
 
