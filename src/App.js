@@ -59,7 +59,6 @@ import SignalWifi4BarLockIcon from '@mui/icons-material/SignalWifi4BarLock';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
 import ListItemIcon from '@mui/material/ListItemIcon';
-import { styled } from '@mui/material/styles';
 import Select from '@mui/material/Select';
 import { HOST } from './config.js';
 
@@ -86,9 +85,8 @@ function App() {
   });
   const [value, setValue] = useState(0);
   const [mobile, setMobile] = useState(true);
-  const ip = `http://${window.location.hostname}`;
-  // const videoUrl = `${ip}:9000/mjpg`
-  let videoUrl = `HTTP://192.168.4.1:9000/mjpg`
+  const videoUrl = `${HOST}:9000/mjpg`
+  // let videoUrl = `HTTP://192.168.4.1:9000/mjpg`
   const updateVersion = async () => {
     try {
       const response = await fetch(`${HOST}/settings`);
@@ -599,61 +597,8 @@ const CameraSharpnessItem = (props) => {
   )
 }
 
-
-
 // AP 频道设置
 const WifiAPChannelItem = (props) => {
-  // const [channel, setChannel] = useState(props.apPhannel);
-  // const [helperText, setHelperText] = useState("");
-  // const [showDoneIcon, setShowDoneIcon] = useState(false);
-  // const handleChange = async (event) => {
-  //   setChannel(event.target.value);
-  //   const sendData = { apChannel: event.target.value };
-  //   try {
-  //     const response = await sendRequest('POST', '/set-apChannel', sendData, true);
-  //     console.log('返回的的数据:', response);
-  //     setHelperText("Setting success");
-  //     setShowDoneIcon(true);
-  //     setTimeout(() => {
-  //       setHelperText("");
-  //       setShowDoneIcon(false);
-  //     }, 3000)
-  //   } catch (error) {
-  //     console.error('Error:', error);
-  //     setHelperText(error);
-  //   }
-  // };
-
-  // return (
-  //   <SettingItem title="AP channel" subtitle="Set AP channel">
-  //     <Box sx={{ width: 200, marginRight: 4, maxWidth: "70%" }}>
-  //       <FormControl variant="standard" sx={{ width: '100%' }}>
-  //         <InputLabel id="demo-simple-select-label">Channel</InputLabel>
-  //         <Select
-  //           labelId="demo-simple-select-label"
-  //           id="demo-simple-select"
-  //           value={channel}
-  //           onChange={handleChange}
-  //           label="Channel"
-  //         >
-  //           {[...Array(11)].map((_, index) => (
-  //             <MenuItem key={index + 1} value={index + 1}>
-  //               {index + 1}
-  //             </MenuItem>
-  //           ))}
-  //         </Select>
-  //         {
-  //           showDoneIcon &&
-  //           <FormHelperText>
-  //             <Box sx={{ display: 'flex', alignItems: 'flex-end' }}>
-  //               <DoneIcon sx={{ paddingRight: 1 }} /> {helperText}
-  //             </Box>
-  //           </FormHelperText>
-  //         }
-  //       </FormControl>
-  //     </Box>
-  //   </SettingItem >
-  // )
   return (
     <SelectableItem
       title="AP Channel"
@@ -681,60 +626,6 @@ const WifiAPNamelItem = (props) => {
 
 // AP type 设置
 const WifiAPTypeItem = (props) => {
-  // const [type, setType] = useState(props.type);
-  // const [helperText, setHelperText] = useState("");
-  // const [showDoneIcon, setShowDoneIcon] = useState(false);
-
-  // useEffect(() => {
-  //   setType(props.type); // 监听 props 的变化
-  // }, [props.type]);
-
-  // const handleChange = async (event) => {
-  //   setType(event.target.value);
-  //   const sendData = { type: event.target.value };
-  //   try {
-  //     const response = await sendRequest('POST', '/set-type', sendData);
-  //     console.log('返回的的数据:', response);
-  //     setHelperText("Setting success");
-  //     setShowDoneIcon(true);
-  //     setTimeout(() => {
-  //       setHelperText("");
-  //       setShowDoneIcon(false);
-  //     }, 3000);
-  //   } catch (error) {
-  //     console.error('Error:', error);
-  //     setHelperText(error);
-  //   }
-
-  // }
-  // return (
-  //   <SettingItem title="Type" subtitle="Set Type">
-  //     <Box sx={{ width: 200, marginRight: 4, maxWidth: "70%" }}>
-  //       <FormControl variant="standard" sx={{ width: '100%' }}>
-  //         <InputLabel id="demo-simple-select-standard-label">Type</InputLabel>
-  //         <Select
-  //           labelId="demo-simple-select-standard-label"
-  //           id="demo-simple-select-standard"
-  //           value={type}
-  //           onChange={handleChange}
-  //           label="Type"
-  //         >
-  //           <MenuItem value={"GalaxyRVR"}>GalaxyRVR</MenuItem>
-  //           <MenuItem value={"ZeusCar"}>ZeusCar</MenuItem>
-  //         </Select>
-  //         {
-  //           showDoneIcon &&
-  //           <FormHelperText>
-  //             <Box sx={{ display: 'flex', alignItems: 'flex-end' }}>
-  //               <DoneIcon sx={{ paddingRight: 1 }} /> {helperText}
-  //             </Box>
-  //           </FormHelperText>
-  //         }
-  //       </FormControl>
-  //     </Box>
-  //   </SettingItem >
-  // )
-
   return (
     <SelectableItem
       title="Type"
@@ -1062,7 +953,7 @@ const UploadFilesItem = (props) => {
       let formData = new FormData();
       formData.append('update', selectedFiles);
       let xhr = new XMLHttpRequest();
-      xhr.open('POST', 'http://192.168.4.1/update');
+      xhr.open('POST', `${HOST}/update`);
       xhr.upload.addEventListener('progress', (e) => {
         if (e.lengthComputable) {
           let progress = e.loaded / e.total * 100;
@@ -1172,24 +1063,6 @@ const SettingItem = (props) => {
     </ListItem>
   </>
   )
-}
-
-const LinearProgressWithLabel = (props) => {
-  // 返回一个Box组件，包含两个子组件
-  return (
-    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-      {/* <Box sx={{ width: '100px', mr: 1 }}> */}
-      <Box sx={{ width: '100%', mr: 1 }}>
-        {/* <LinearProgress  variant="determinate" color="secondary" {...props} /> */}
-        <LinearProgress sx={{ height: "10px", borderRadius: "2px" }} variant="determinate"  {...props} />
-      </Box>
-      {/* <Box sx={{ minWidth: 35 }}>
-        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-          {`${Math.round(props.value)}%`}
-        </Typography>
-      </Box> */}
-    </Box>
-  );
 }
 
 function CircularProgressWithLabel(
