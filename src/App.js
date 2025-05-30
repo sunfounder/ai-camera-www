@@ -83,7 +83,7 @@ function App() {
     macPrefix: "xxxxxx",
     ipAddress: "192.168.4.1"
   });
-  const [value, setValue] = useState(0);
+  const [value, setValue] = useState(localStorage.getItem("tabIndex") || 0);
   const [mobile, setMobile] = useState(true);
   const videoUrl = `${HOST}:9000/mjpg`
   // let videoUrl = `HTTP://192.168.4.1:9000/mjpg`
@@ -96,6 +96,17 @@ function App() {
       console.error("Failed to fetch settings:", error);
     }
   }
+
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+  const updateData = (key, value) => {
+    console.log("updateData", key, value);
+    setData(prevData => ({
+      ...prevData,  // 保留原有的数据
+      [key]: value  // 更新指定的属性
+    }));
+  };
+
 
   const handeleCameraPreview = (value) => {
     setCameraPreview(value);
@@ -120,26 +131,32 @@ function App() {
 
   const handleChange = (event, newValue) => {
     setValue(newValue);
+    localStorage.setItem('tabIndex', newValue);
   };
 
-  const BaseSettings = ({ data }) => {
+  const handleMenuItems = (index) => {
+    setValue(index);
+    localStorage.setItem('tabIndex', index);
+  }
+
+  const BaseSettings = ({ data, updateData }) => {
     return (
       <>
-        <WifiAPNamelItem name={data.name} />
-        <WifiAPTypeItem type={data.type} />
-        <InfoItem title="Mac Address" value={data.macAddress} />
-        <InfoItem title="IP Address" value={data.ipAddress} />
+        <WifiAPNamelItem name={data.name} updateData={updateData} />
+        <WifiAPTypeItem type={data.type} updateData={updateData} />
+        <InfoItem title="Mac Address" value={data.macAddress} updateData={updateData} />
+        <InfoItem title="IP Address" value={data.ipAddress} updateData={updateData} />
         <WifiRebootItem />
       </>
     )
   }
 
-  const APSettings = ({ data }) => {
+  const APSettings = ({ data, updateData }) => {
     return (
       <>
-        <WifiAPSsidItem apSsid={data.apSsid} macPrefix={data.macPrefix} />
-        <WifiAPPasswordItem apPassword={data.apPassword} />
-        <WifiAPChannelItem apPhannel={data.apChannel} />
+        <WifiAPSsidItem apSsid={data.apSsid} macPrefix={data.macPrefix} updateData={updateData} />
+        <WifiAPPasswordItem apPassword={data.apPassword} updateData={updateData} />
+        <WifiAPChannelItem apPhannel={data.apChannel} updateData={updateData} />
       </>
     )
   }
@@ -147,21 +164,21 @@ function App() {
   const SteWifiSettings = ({ data }) => {
     return (
       <>
-        <WifiStaSsidItem staSsid={data.staSsid} staPassword={data.staPassword} />
+        <WifiStaSsidItem staSsid={data.staSsid} staPassword={data.staPassword} updateData={updateData} mobile={mobile} isSafari={isSafari} />
       </>
     )
   }
 
-  const CameraSettings = ({ data, handeleCameraPreview, cameraPreview }) => {
+  const CameraSettings = ({ data, handeleCameraPreview, cameraPreview, updateData }) => {
     return (
       <>
         <CameraPreviewItem onCameraPreviewSwitch={handeleCameraPreview} cameraPreview={cameraPreview} />
-        <CameraHorizontalFlipItem horizontal={data.cameraHorizontalMirror} />
-        <CameraVerticalFlipItem vertical={data.cameraVerticalFlip} />
-        <CameraBrightnessItem brightness={data.cameraBrightness} />
-        <CameraContrastItem contrast={data.cameraContrast} />
-        <CameraSaturationItem saturation={data.cameraSaturation} />
-        <CameraSharpnessItem sharpness={data.cameraSharpness} />
+        <CameraHorizontalFlipItem horizontal={data.cameraHorizontalMirror} updateData={updateData} />
+        <CameraVerticalFlipItem vertical={data.cameraVerticalFlip} updateData={updateData} />
+        <CameraBrightnessItem brightness={data.cameraBrightness} updateData={updateData} />
+        <CameraContrastItem contrast={data.cameraContrast} updateData={updateData} />
+        <CameraSaturationItem saturation={data.cameraSaturation} updateData={updateData} />
+        <CameraSharpnessItem sharpness={data.cameraSharpness} updateData={updateData} />
       </>
     )
   }
@@ -170,16 +187,16 @@ function App() {
     return (
       <>
         <InfoItem title="Version" subtitle="Firmware version" value={data.version} />
-        <UploadFilesItem mobile={mobile} />
+        <UploadFilesItem mobile={mobile} isSafari={isSafari} />
       </>
     )
   }
 
   const settingsMap = {
-    0: <BaseSettings data={data} />,
-    1: <APSettings data={data} />,
-    2: <SteWifiSettings data={data} />,
-    3: <CameraSettings data={data} handeleCameraPreview={handeleCameraPreview} cameraPreview={cameraPreview} />,
+    0: <BaseSettings data={data} updateData={updateData} />,
+    1: <APSettings data={data} updateData={updateData} />,
+    2: <SteWifiSettings data={data} updateData={updateData} mobile={mobile} />,
+    3: <CameraSettings data={data} handeleCameraPreview={handeleCameraPreview} cameraPreview={cameraPreview} updateData={updateData} />,
     4: <OTASettings data={data} mobile={mobile} />
   };
 
@@ -190,7 +207,6 @@ function App() {
     { label: "Camera", icon: <CameraAltIcon />, value: 3 },
     { label: "OTA", icon: <UpgradeIcon />, value: 4 }
   ];
-
 
   return (
     <>
@@ -228,7 +244,7 @@ function App() {
 
               <List>
                 {menuItems.map(item => (
-                  <ListItemButton key={item.value} onClick={() => setValue(item.value)}>
+                  <ListItemButton key={item.value} onClick={() => handleMenuItems(item.value)}>
                     <ListItemIcon>{item.icon}</ListItemIcon>
                     <ListItemText primary={item.label} />
                   </ListItemButton>
@@ -257,6 +273,8 @@ function App() {
           <BottomNavigation
             sx={{
               width: "100%",
+              position: "fixed",
+              bottom: `env(safe-area-inset-bottom,56px)`
             }}
             showLabels
             value={value}
@@ -273,10 +291,6 @@ function App() {
     </>
   );
 }
-
-
-
-
 
 const sendRequest = (method, url, data = null) => {
   return new Promise((resolve, reject) => {
@@ -317,6 +331,7 @@ const SwitchItem = (props) => {
     try {
       const response = await sendRequest('POST', '/set-' + props.name, sendData, true);
       console.log('返回的的数据:', response);
+      props.updateData(props.name, event.target.checked);
     } catch (error) {
       console.error('Error:', error);
     }
@@ -342,6 +357,7 @@ const SliderItem = (props) => {
     try {
       const response = await sendRequest('POST', '/set-' + props.name, sendData, true);
       console.log('返回的的数据:', response);
+      props.updateData(props.name, newValue);
     } catch (error) {
       console.error('Error:', error);
     }
@@ -366,7 +382,7 @@ const SliderItem = (props) => {
   )
 }
 
-const SelectableItem = ({ title, subtitle, value, options, onChange, apiEndpoint }) => {
+const SelectableItem = ({ title, subtitle, value, options, onChange, apiEndpoint, updateData }) => {
   const [selectedValue, setSelectedValue] = useState(value);
   const [helperText, setHelperText] = useState("");
   const [showDoneIcon, setShowDoneIcon] = useState(false);
@@ -380,7 +396,7 @@ const SelectableItem = ({ title, subtitle, value, options, onChange, apiEndpoint
     try {
       const response = await sendRequest('POST', '/set-' + apiEndpoint, sendData);
       console.log('Response:', response);
-
+      updateData(apiEndpoint, newValue);
       setHelperText("Setting success");
       setShowDoneIcon(true);
       setTimeout(() => {
@@ -424,7 +440,7 @@ const SelectableItem = ({ title, subtitle, value, options, onChange, apiEndpoint
   );
 };
 
-const EditableItem = ({ title, subtitle, value, onChange, apiEndpoint, type = "text" }) => {
+const EditableItem = ({ title, subtitle, value, onChange, apiEndpoint, type = "text", updateData }) => {
   const [inputValue, setInputValue] = useState(value);
   const [loading, setLoading] = useState(false);
   const [helperText, setHelperText] = useState("");
@@ -444,6 +460,7 @@ const EditableItem = ({ title, subtitle, value, onChange, apiEndpoint, type = "t
     try {
       const response = await sendRequest('POST', '/set-' + apiEndpoint, sendData);
       console.log('返回的数据:', response);
+      updateData(apiEndpoint, inputValue);
       setLoading(false);
       setHelperText("Success, Restart to apply.");
       setShowDoneIcon(true);
@@ -525,6 +542,7 @@ const CameraHorizontalFlipItem = (props) => {
       subtitle="Set horizontal flip"
       name="cameraHorizontalMirror"
       checked={props.horizontal}
+      updateData={props.updateData}
     />
   )
 }
@@ -537,6 +555,7 @@ const CameraVerticalFlipItem = (props) => {
       subtitle="Set vertical flip"
       name="cameraVerticalFlip"
       checked={props.vertical}
+      updateData={props.updateData}
     />
   );
 }
@@ -551,6 +570,7 @@ const CameraBrightnessItem = (props) => {
       value={props.brightness}
       min={-3}
       max={3}
+      updateData={props.updateData}
     />
   )
 }
@@ -565,6 +585,7 @@ const CameraContrastItem = (props) => {
       value={props.contrast}
       min={-3}
       max={3}
+      updateData={props.updateData}
     />
   )
 }
@@ -579,6 +600,7 @@ const CameraSaturationItem = (props) => {
       value={props.saturation}
       min={-3}
       max={3}
+      updateData={props.updateData}
     />
   )
 }
@@ -593,6 +615,7 @@ const CameraSharpnessItem = (props) => {
       value={props.sharpness}
       min={-3}
       max={3}
+      updateData={props.updateData}
     />
   )
 }
@@ -607,6 +630,7 @@ const WifiAPChannelItem = (props) => {
       options={[...Array(11)].map((_, index) => index + 1)}
       onChange={props.onChannelChange}
       apiEndpoint="apChannel"
+      updateData={props.updateData}
     />
   );
 }
@@ -620,6 +644,7 @@ const WifiAPNamelItem = (props) => {
       value={props.name}
       onChange={props.onNameChange}
       apiEndpoint="name"
+      updateData={props.updateData}
     />
   );
 }
@@ -634,6 +659,7 @@ const WifiAPTypeItem = (props) => {
       options={["GalaxyRVR", "ZeusCar"]}
       onChange={props.onTypeChange}
       apiEndpoint="type"
+      updateData={props.updateData}
     />
   )
 }
@@ -715,6 +741,7 @@ const WifiAPPasswordItem = (props) => {
       onChange={props.onPasswordChange}
       apiEndpoint="apPassword"
       type="password"
+      updateData={props.updateData}
     />
   );
 }
@@ -745,6 +772,8 @@ const WifiStaSsidItem = (props) => {
     try {
       const response = await sendRequest('POST', '/set-sta', sendData);
       console.log('返回的的数据:', response);
+      props.updateData("ssid", staSsid);
+      props.updateData("password", staPassword);
       setShowDoneIcon(true);
       setHelperText("Success,Restart to apply.");
       setTimeout(() => {
@@ -758,6 +787,7 @@ const WifiStaSsidItem = (props) => {
       setLoading(false);
     }
   }
+
 
   return (
     <>
@@ -792,7 +822,15 @@ const WifiStaSsidItem = (props) => {
         </Box>
       </SettingItem>
       <Zoom in disabled={loading ? true : false}>
-        <Fab variant="extended" color="primary" sx={{ position: "absolute", right: 16, bottom: 16 }} onClick={handleChangeCommitted}>
+        <Fab
+          variant="extended"
+          color="primary"
+          sx={{
+            position: "absolute",
+            right: 16,
+            // bottom: props.mobile ? `calc(env(safe-area-inset-bottom, 56px) + 72px)` : 16
+            bottom: !props.mobile ? 16 : props.isSafari ? "calc(env(safe-area-inset-bottom, 56px) + 144px)" : "calc(env(safe-area-inset-bottom, 56px) + 72px)"
+          }} onClick={handleChangeCommitted}>
           {
             loading ? <CircularProgress color="inherit" size={20} sx={{ mr: 1 }} /> : <DoneIcon sx={{ mr: 1 }} />
           }
@@ -1049,7 +1087,11 @@ const UploadFilesItem = (props) => {
           }
           color="primary"
           disabled={progressShow ? true : false}
-          sx={{ position: "absolute", right: 16, bottom: 16 }}
+          sx={{
+            position: "absolute",
+            right: 16,
+            bottom: !props.mobile ? 16 : props.isSafari ? "calc(env(safe-area-inset-bottom, 56px) + 144px)" : "calc(env(safe-area-inset-bottom, 56px) + 72px)"
+          }}
           onClick={handleUpload}
         >
           {
