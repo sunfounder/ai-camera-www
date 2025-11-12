@@ -688,11 +688,16 @@ const WifiRebootItem = (props) => {
 
   return (
     <>
-      <SettingItem title="Reboot" subtitle="Reboot Device">
-        <Box sx={{ width: 200, maxWidth: "70%", display: 'flex', justifyContent: 'flex-end' }}>
-          <Button variant="contained" color="error" onClick={handleRebootDevice}>Reboot</Button>
-        </Box>
-      </SettingItem>
+      <ListItemButton
+        component="label"
+        variant="contained"
+        startIcon={<CloudUploadIcon />}
+        color='inherit'
+        onClick={handleRebootDevice}
+      >
+        <ListItemText primary="Reboot" secondary="Reboot Device" />
+        <ChevronRightIcon />
+      </ListItemButton>
       <DialogBox
         onConfirm={handleConfirm}
         onClose={handleClose}
@@ -969,13 +974,16 @@ const SettingItemSSIDList = (props) => {
 }
 
 const UploadFilesItem = (props) => {
-  const [selectedFileName, setSelectedFileName] = useState('Upload files');
+  const [selectedFileName, setSelectedFileName] = useState('Choose a binary file to upgrade');
   const [selectedFiles, setSelectedFiles] = useState(null);
   const [progress, setProgress] = useState(0);
   const [progressShow, setProgressShow] = useState(false);
   const [dialogShow, setDialogShow] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false); //文件是否上传成功
+  const [dialogContent, setDialogContent] = useState('');
   const handleSelectFile = (event) => {
+    setUploadSuccess(false);
     const files = event.target.files;
     if (files.length > 0) {
       const file = files[0];
@@ -983,17 +991,26 @@ const UploadFilesItem = (props) => {
       if (file.name.endsWith('.bin')) {
         setSelectedFiles(file);
         setSelectedFileName(file.name);
+        setProgressShow(true);
+        setDialogShow(true);
+        setDialogContent(`Upgrading firmware ${file.name}. Please do not refresh the page, disconnect the power, or reset the device.`);
       } else {
         alert('Please select a .bin file only.');
         event.target.value = ''; // 清空文件选择
-        setSelectedFileName('Upload files');
+        setSelectedFileName('Choose a binary file to upgrade');
       }
     }
   };
+
+  useEffect(() => {
+    // 因为选择完文件后，setSelectedFiles异步，马上调用handleUpload，selectedFiles可能还没有更新
+    if (selectedFiles) {
+      handleUpload();
+    }
+  }, [selectedFiles]);
+
   const handleUpload = (event) => {
     if (selectedFiles) {
-      setProgressShow(true);
-      setDialogShow(true);
       let formData = new FormData();
       formData.append('update', selectedFiles);
       let xhr = new XMLHttpRequest();
@@ -1005,28 +1022,55 @@ const UploadFilesItem = (props) => {
           console.log('当前状态:', xhr.status);
           if (progress === 100 && xhr.status === 200) {
             setProgressShow(false);
-            setSelectedFileName('Upload files');
+            setSelectedFiles(null);
           }
         }
       });
 
       xhr.onload = () => {
         if (xhr.status === 200) {
-          const responseData = JSON.parse(xhr.responseText);
+          // const responseData = JSON.parse(xhr.responseText);
+          // 判断数据格式
+          let responseData = xhr.responseText;
+          if (xhr.responseText.startsWith('{') && xhr.responseText.endsWith('}')) {
+            responseData = JSON.parse(xhr.responseText);
+          }
           console.log('响应数据:', responseData);
-          setProgressShow(false);
-          setSelectedFileName('Upload files');
+          setUploadSuccess(true);
+          setDialogContent("File upload successfully, Are you sure you want to reboot the device?");
         } else {
-          console.error('上传失败:', xhr.statusText);
+          let responseData = xhr.responseText;
+          if (xhr.responseText.startsWith('{') && xhr.responseText.endsWith('}')) {
+            responseData = JSON.parse(xhr.responseText);
+          }
+          console.error('上传失败:', responseData);
+          setUploadSuccess(false);
+          setDialogContent("Upload upload failed : " + responseData);
         }
+        setProgressShow(false);
+        setSelectedFiles(null);
+        setSelectedFileName('Choose a binary file to upgrade');
       };
 
-
+      xhr.onerror = () => {
+        console.error('Network error occurred during upload.');
+        setUploadSuccess(false);
+        setDialogContent("Upload failed due to a network error.");
+        setProgressShow(false);
+        setSelectedFiles(null);
+        setSelectedFileName('Choose a binary file to upgrade');
+      };
       xhr.send(formData);
     }
   };
+
   const handleConfirm = async () => {
+    if (!uploadSuccess) {
+      handleClose();
+      return;
+    };
     setLoading(true);
+    setDialogContent("The device is restarting. Please check the network status later.");
     try {
       const response = await sendRequest('POST', '/restart');
       console.log('返回的的数据:', response);
@@ -1041,15 +1085,14 @@ const UploadFilesItem = (props) => {
   }
 
   // 文件上传按钮组件
-  const FileUploadButton = ({ selectedFileName, handleSelectFile }) => (
+  const FileSelectionButton = ({ selectedFileName, handleSelectFile }) => (
     <ListItemButton
       component="label"
       variant="contained"
       startIcon={<CloudUploadIcon />}
       color='inherit'
     >
-      <ListItemText primary="Choose File" secondary={selectedFileName} />
-      {/* {selectedFileName} */}
+      <ListItemText primary="Upgrade Firmware" secondary={selectedFileName} />
       <input
         type="file"
         accept=".bin"
@@ -1061,46 +1104,9 @@ const UploadFilesItem = (props) => {
     </ListItemButton>
   );
 
-  // useEffect(() => {
-  //   if (progressShow) {
-  //     const timer = setInterval(() => {
-  //       setProgress((prevProgress) => (prevProgress >= 100 ? 0 : prevProgress + 10));
-  //     }, 800);
-  //     return () => {
-  //       if (progress >= 100) {
-  //         setProgressShow(false);
-  //         setDialogShow(true);
-  //       }
-  //       clearInterval(timer);
-  //     }
-  //   }
-  // })
-
   return (
     <>
-      <FileUploadButton selectedFileName={selectedFileName} handleSelectFile={handleSelectFile} />
-      <Zoom in>
-        <Fab
-          variant={
-            // progressShow ? "circular" : "extended"
-            "extended"
-          }
-          color="primary"
-          disabled={progressShow ? true : false}
-          sx={{
-            position: "absolute",
-            right: 16,
-            bottom: !props.mobile ? 16 : props.isSafari ? "calc(env(safe-area-inset-bottom, 56px) + 144px)" : "calc(env(safe-area-inset-bottom, 56px) + 72px)"
-          }}
-          onClick={handleUpload}
-        >
-          {
-            // progressShow ?
-            // <CircularProgressWithLabel value={progress} size={64}></CircularProgressWithLabel> :
-            <><UpgradeIcon sx={{ mr: 1 }} />{selectedFiles ? "Update" : "Please select file"}</>
-          }
-        </Fab>
-      </Zoom>
+      <FileSelectionButton selectedFileName={selectedFileName} handleSelectFile={handleSelectFile} />
       <DialogBox
         onConfirm={handleConfirm}
         onClose={handleClose}
@@ -1111,11 +1117,9 @@ const UploadFilesItem = (props) => {
         children={
           progressShow && <LinearProgressWithLabel value={progress} />
         }
-        title="OTA"
-        content={
-          !progressShow && !loading ? "File uploaded successfully, Are you sure you want to reboot the device?"
-            : (loading ? "The device is restarting. Please check the network status later." : "OTA is currently upgrading. Please do not refresh the page, disconnect the power, or reset the device.")
-        } />
+        title="Upgrade Firmware"
+        content={dialogContent}
+      />
     </>
   )
 }
@@ -1171,7 +1175,6 @@ const DialogBox = (props) => {
     <>
       <Dialog
         open={props.open}
-        // onClose={props.onClose}
         aria-labelledby="alert-dialog-title"
         aria-describedby="alert-dialog-description"
       >
@@ -1206,14 +1209,9 @@ const DialogBox = (props) => {
 const LinearProgressWithLabel = (props) => {
   // 返回一个Box组件，包含两个子组件
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', marginTop: 2 }}>
+    <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', marginTop: 2 }}>
       <Box sx={{ width: '100%', mr: 1 }}>
-        <LinearProgress variant="determinate"  {...props} sx={{ height: '15px', borderRadius: '5px' }} />
-      </Box>
-      <Box sx={{ minWidth: 35 }}>
-        <Typography variant="body2" >
-          {`${Math.round(props.value)}%`}
-        </Typography>
+        <LinearProgress variant="determinate" {...props} />
       </Box>
     </Box>
   );
