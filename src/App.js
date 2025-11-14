@@ -1,5 +1,5 @@
 import './App.css';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Button,
@@ -33,7 +33,9 @@ import {
   DialogContent,
   DialogActions,
   DialogContentText,
-  Zoom
+  Zoom,
+  Alert,
+  Stack
 } from '@mui/material';
 
 import {
@@ -85,6 +87,13 @@ function App() {
   });
   const [value, setValue] = useState(localStorage.getItem("tabIndex") || 0);
   const [mobile, setMobile] = useState(true);
+  const [needReboot, setNeedReboot] = useState(false);
+  const [alertDialogShow, setAlertDialogShow] = useState(false);
+  const [alertDialogContent, setAlertDialogContent] = useState("");
+  const [alertDialogConfirmButton, steAlertDialogConfirmButton] = useState(true);
+  const [alertDialogCancelButton, setAlertDialogCancelButton] = useState(true);
+  const [alertDialogLoading, setAlertDialogLoading] = useState(false);
+  const [stackHeight, setStackHeight] = useState(0);
   const videoUrl = `${HOST}:9000/mjpg`
   // let videoUrl = `HTTP://192.168.4.1:9000/mjpg`
   const updateVersion = async () => {
@@ -139,11 +148,11 @@ function App() {
     localStorage.setItem('tabIndex', index);
   }
 
-  const BaseSettings = ({ data, updateData }) => {
+  const BaseSettings = ({ data, updateData, handeleNeedReboot }) => {
     return (
       <>
-        <WifiAPNamelItem name={data.name} updateData={updateData} />
-        <WifiAPTypeItem type={data.type} updateData={updateData} />
+        <WifiAPNamelItem name={data.name} updateData={updateData} handeleNeedReboot={handeleNeedReboot} />
+        <WifiAPTypeItem type={data.type} updateData={updateData} handeleNeedReboot={handeleNeedReboot} />
         <InfoItem title="Mac Address" value={data.macAddress} updateData={updateData} />
         <InfoItem title="IP Address" value={data.ipAddress} updateData={updateData} />
         <WifiRebootItem />
@@ -151,12 +160,12 @@ function App() {
     )
   }
 
-  const APSettings = ({ data, updateData }) => {
+  const APSettings = ({ data, updateData, handeleNeedReboot }) => {
     return (
       <>
         <WifiAPSsidItem apSsid={data.apSsid} macPrefix={data.macPrefix} updateData={updateData} />
-        <WifiAPPasswordItem apPassword={data.apPassword} updateData={updateData} />
-        <WifiAPChannelItem apPhannel={data.apChannel} updateData={updateData} />
+        <WifiAPPasswordItem apPassword={data.apPassword} updateData={updateData} handeleNeedReboot={handeleNeedReboot} />
+        <WifiAPChannelItem apPhannel={data.apChannel} updateData={updateData} handeleNeedReboot={handeleNeedReboot} />
       </>
     )
   }
@@ -164,7 +173,7 @@ function App() {
   const SteWifiSettings = ({ data }) => {
     return (
       <>
-        <WifiStaSsidItem staSsid={data.staSsid} staPassword={data.staPassword} updateData={updateData} mobile={mobile} isSafari={isSafari} />
+        <WifiStaSsidItem staSsid={data.staSsid} staPassword={data.staPassword} updateData={updateData} mobile={mobile} isSafari={isSafari} handeleNeedReboot={handeleNeedReboot} />
       </>
     )
   }
@@ -191,11 +200,17 @@ function App() {
       </>
     )
   }
+  const handeleNeedReboot = (data) => {
+    setNeedReboot(data);
+  }
+  const getStackHeightChange = (height) => {
+    setStackHeight(height);
+  }
 
   const settingsMap = {
-    0: <BaseSettings data={data} updateData={updateData} />,
-    1: <APSettings data={data} updateData={updateData} />,
-    2: <SteWifiSettings data={data} updateData={updateData} mobile={mobile} />,
+    0: <BaseSettings data={data} updateData={updateData} handeleNeedReboot={handeleNeedReboot} />,
+    1: <APSettings data={data} updateData={updateData} handeleNeedReboot={handeleNeedReboot} />,
+    2: <SteWifiSettings data={data} updateData={updateData} mobile={mobile} handeleNeedReboot={handeleNeedReboot} />,
     3: <CameraSettings data={data} handeleCameraPreview={handeleCameraPreview} cameraPreview={cameraPreview} updateData={updateData} />,
     4: <OTASettings data={data} mobile={mobile} />
   };
@@ -207,6 +222,39 @@ function App() {
     { label: "Camera", icon: <CameraAltIcon />, value: 3 },
     { label: "OTA", icon: <UpgradeIcon />, value: 4 }
   ];
+
+  const handeleAlertConfirmButton = () => {
+    setAlertDialogShow(true);
+    steAlertDialogConfirmButton(true);
+    setAlertDialogContent("Are you sure you want to reboot the device?");
+  }
+  const handeleAlertCloseButton = () => {
+    setNeedReboot(false);
+    setStackHeight(0);
+  }
+
+  const handleAlertDialogClose = () => {
+    setAlertDialogShow(false);
+  }
+  const handleAlertDialogConfirm = async () => {
+    setAlertDialogContent("Rebooting. Reconnect to WiFi if needed. Waiting for device connection");
+    // steAlertDialogConfirmButton(false);
+    setAlertDialogCancelButton(false);
+    setAlertDialogLoading(true);
+    // setNeedReboot(false);
+    try {
+      const response = await sendRequest('POST', '/restart');
+      console.log('返回的的数据:', response);
+      const intervalId = setInterval(handleReconnectResponse, 5000);
+      // 网络发生变化时
+      window.addEventListener('online', () => {
+        handleReconnectResponse();
+      });
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
 
   return (
     <>
@@ -224,6 +272,26 @@ function App() {
             </Typography>
           </Toolbar>
         </AppBar>
+        {
+          needReboot &&
+          <AlertStack
+            alertContent="Reboot to take effect."
+            alertConfirmButtonContent="Reboot"
+            // alertCloseButtonContent="Close"
+            onAlertConfirm={handeleAlertConfirmButton}
+            onAlertClose={handeleAlertCloseButton}
+            alertDialogShow={alertDialogShow}
+            alertDialogConfirmButton={alertDialogConfirmButton}
+            alertDialogCancelButton={alertDialogCancelButton}
+            onAlertDialogConfirm={handleAlertDialogConfirm}
+            onAlertDialogClose={handleAlertDialogClose}
+            alertDialogContent={alertDialogContent}
+            severity="warning"
+            alertDialogTitle="Reboot"
+            alertDialogLoading={alertDialogLoading}
+            getStackHeightChange={getStackHeightChange}
+          />
+        }
         <Box sx={{
           backgroundColor: 'white',
           height: "100%",
@@ -241,7 +309,7 @@ function App() {
                 [`& .MuiDrawer-paper`]: { width: 240, boxSizing: 'border-box' },
               }}>
               <Toolbar />
-
+              {stackHeight != 0 && <Box sx={{ width: 24, height: stackHeight }}></Box>}
               <List>
                 {menuItems.map(item => (
                   <ListItemButton key={item.value} onClick={() => handleMenuItems(item.value)}>
@@ -258,7 +326,7 @@ function App() {
                 maxWidth: "600px",
                 position: 'relative',
                 margin: 'auto',
-                display: cameraPreview && value === 3 ? 'block' : 'none'
+                display: cameraPreview && Number(value) === 3 ? 'block' : 'none'
               }}>
                 <img style={{ width: "100%", height: "100%" }} src={videoUrl} />
               </Box>
@@ -291,6 +359,20 @@ function App() {
     </>
   );
 }
+
+const handleReconnectResponse = async () => {
+  try {
+    const response = await fetch(`${HOST}/settings`);
+    if (response.ok) { // 检查请求是否成功
+      console.log('请求成功，正在刷新页面...');
+      window.location.reload(); // 刷新页面
+    } else {
+      console.error('请求失败，状态码:', response.status);
+    }
+  } catch (error) {
+    console.error('请求过程中出现错误:', error);
+  }
+};
 
 const sendRequest = (method, url, data = null) => {
   return new Promise((resolve, reject) => {
@@ -327,7 +409,7 @@ const SwitchItem = (props) => {
 
   const handleChange = async (event) => {
     setChecked(event.target.checked);
-    const sendData = { [props.name]: event.target.checked };
+    const sendData = { [props.requestParameter]: event.target.checked };
     try {
       const response = await sendRequest('POST', '/set-' + props.name, sendData, true);
       console.log('返回的的数据:', response);
@@ -353,7 +435,7 @@ const SliderItem = (props) => {
   };
   const handleChangeCommitted = async (event, newValue) => {
     setValue(newValue);
-    const sendData = { [props.name]: newValue };
+    const sendData = { [props.requestParameter]: newValue };
     try {
       const response = await sendRequest('POST', '/set-' + props.name, sendData, true);
       console.log('返回的的数据:', response);
@@ -382,7 +464,7 @@ const SliderItem = (props) => {
   )
 }
 
-const SelectableItem = ({ title, subtitle, value, options, onChange, apiEndpoint, updateData }) => {
+const SelectableItem = ({ title, subtitle, value, options, onChange, apiEndpoint, updateData, handeleNeedReboot }) => {
   const [selectedValue, setSelectedValue] = useState(value);
   const [helperText, setHelperText] = useState("");
   const [showDoneIcon, setShowDoneIcon] = useState(false);
@@ -403,6 +485,7 @@ const SelectableItem = ({ title, subtitle, value, options, onChange, apiEndpoint
         setHelperText("");
         setShowDoneIcon(false);
       }, 3000);
+      handeleNeedReboot(true); // 设置需要重启
     } catch (error) {
       console.error('Error:', error);
       setHelperText("Error occurred");
@@ -440,7 +523,7 @@ const SelectableItem = ({ title, subtitle, value, options, onChange, apiEndpoint
   );
 };
 
-const EditableItem = ({ title, subtitle, value, onChange, apiEndpoint, type = "text", updateData }) => {
+const EditableItem = ({ title, subtitle, value, onChange, apiEndpoint, type = "text", updateData, handeleNeedReboot }) => {
   const [inputValue, setInputValue] = useState(value);
   const [loading, setLoading] = useState(false);
   const [helperText, setHelperText] = useState("");
@@ -455,11 +538,16 @@ const EditableItem = ({ title, subtitle, value, onChange, apiEndpoint, type = "t
   };
 
   const handleChangeCommitted = async () => {
+    console.log("commit");
     setLoading(true);
     const sendData = { [apiEndpoint]: inputValue };
+    const sendDataApSsid = { apSsid: inputValue };
+    // handeleNeedReboot(true); // 设置需要重启
     try {
       const response = await sendRequest('POST', '/set-' + apiEndpoint, sendData);
+      const responseApSsid = await sendRequest('POST', '/set-apSsid', sendDataApSsid);
       console.log('返回的数据:', response);
+      console.log('返回的数据:', responseApSsid);
       updateData(apiEndpoint, inputValue);
       setLoading(false);
       setHelperText("Success, Restart to apply.");
@@ -468,6 +556,7 @@ const EditableItem = ({ title, subtitle, value, onChange, apiEndpoint, type = "t
         setHelperText("");
         setShowDoneIcon(false);
       }, 3000);
+      handeleNeedReboot(true); // 设置需要重启
     } catch (error) {
       console.error('Error:', error);
       setHelperText(error.message || "Error occurred");
@@ -541,6 +630,7 @@ const CameraHorizontalFlipItem = (props) => {
       title="Horizontal flip"
       subtitle="Set horizontal flip"
       name="cameraHorizontalMirror"
+      requestParameter="camHFlip"
       checked={props.horizontal}
       updateData={props.updateData}
     />
@@ -554,6 +644,7 @@ const CameraVerticalFlipItem = (props) => {
       title="Vertical flip"
       subtitle="Set vertical flip"
       name="cameraVerticalFlip"
+      requestParameter="camVFlip"
       checked={props.vertical}
       updateData={props.updateData}
     />
@@ -567,6 +658,7 @@ const CameraBrightnessItem = (props) => {
       title="Brightness"
       subtitle="Set brightness"
       name="cameraBrightness"
+      requestParameter="camBrightness"
       value={props.brightness}
       min={-3}
       max={3}
@@ -582,6 +674,7 @@ const CameraContrastItem = (props) => {
       title="Contrast"
       subtitle="Set contrast"
       name="cameraContrast"
+      requestParameter="camContrast"
       value={props.contrast}
       min={-3}
       max={3}
@@ -597,6 +690,7 @@ const CameraSaturationItem = (props) => {
       title="Saturation"
       subtitle="Set saturation"
       name="cameraSaturation"
+      requestParameter="camSaturation"
       value={props.saturation}
       min={-3}
       max={3}
@@ -612,6 +706,7 @@ const CameraSharpnessItem = (props) => {
       title="Sharpness"
       subtitle="Set sharpness"
       name="cameraSharpness"
+      requestParameter="camSharpness"
       value={props.sharpness}
       min={-3}
       max={3}
@@ -631,6 +726,7 @@ const WifiAPChannelItem = (props) => {
       onChange={props.onChannelChange}
       apiEndpoint="apChannel"
       updateData={props.updateData}
+      handeleNeedReboot={props.handeleNeedReboot}
     />
   );
 }
@@ -645,6 +741,7 @@ const WifiAPNamelItem = (props) => {
       onChange={props.onNameChange}
       apiEndpoint="name"
       updateData={props.updateData}
+      handeleNeedReboot={props.handeleNeedReboot}
     />
   );
 }
@@ -660,6 +757,7 @@ const WifiAPTypeItem = (props) => {
       onChange={props.onTypeChange}
       apiEndpoint="type"
       updateData={props.updateData}
+      handeleNeedReboot={props.handeleNeedReboot}
     />
   )
 }
@@ -668,14 +766,27 @@ const WifiAPTypeItem = (props) => {
 const WifiRebootItem = (props) => {
   const [dialogShow, setDialogShow] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [confirmButton, setConfirmButton] = useState(false);
+  const [closeButton, setCloseButton] = useState(true);
   const handleRebootDevice = async () => {
     setDialogShow(true);
+    setConfirmButton(true);
   }
+
   const handleConfirm = async () => {
     setLoading(true);
+    setCloseButton(false);
     try {
       const response = await sendRequest('POST', '/restart');
       console.log('返回的的数据:', response);
+      if (response === "OK") {
+        // setLoading(false);
+        const intervalId = setInterval(handleReconnectResponse, 5000);
+        // 网络发生变化时
+        window.addEventListener('online', () => {
+          handleReconnectResponse();
+        });
+      }
     } catch (error) {
       console.error('Error:', error);
     }
@@ -702,11 +813,11 @@ const WifiRebootItem = (props) => {
         onConfirm={handleConfirm}
         onClose={handleClose}
         open={dialogShow}
-        confirmButton
-        cancelButton
+        confirmButton={confirmButton}
+        cancelButton={closeButton}
         loading={loading}
         title="Reboot"
-        content={loading ? "The device is restarting. Please check the network status later. " : "Are you sure you want to reboot the device? "} />
+        content={loading ? "Rebooting. Reconnect to WiFi if needed. Waiting for device connection " : "Are you sure you want to reboot the device? "} />
     </>
   )
 }
@@ -747,6 +858,7 @@ const WifiAPPasswordItem = (props) => {
       apiEndpoint="apPassword"
       type="password"
       updateData={props.updateData}
+      handeleNeedReboot={props.handeleNeedReboot}
     />
   );
 }
@@ -759,6 +871,7 @@ const WifiStaSsidItem = (props) => {
   const [showDoneIcon, setShowDoneIcon] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // const viewportHeight = window.innerHeight / 3;
   const handleSsidChange = (value) => {
     setStaSsid(value);
   }
@@ -785,7 +898,8 @@ const WifiStaSsidItem = (props) => {
         setHelperText("");
         setShowDoneIcon(false);
         setLoading(false);
-      }, 3000)
+      }, 3000);
+      // props.handeleNeedReboot(true);
     } catch (error) {
       console.error('Error:', error);
       setHelperText(error);
@@ -804,7 +918,7 @@ const WifiStaSsidItem = (props) => {
         onIinputChange={handleSSIDListInputChange}
       />
       <SettingItem title="STA password" subtitle="Set Sta password" >
-        <Box sx={{ width: 200, maxWidth: "50%", }}>
+        <Box sx={{ width: 200, maxWidth: "70%", }}>
           <TextField
             id="standard-password-input"
             label="Password"
@@ -831,10 +945,11 @@ const WifiStaSsidItem = (props) => {
           variant="extended"
           color="primary"
           sx={{
-            position: "absolute",
+            position: "fixed",
             right: 16,
-            // bottom: props.mobile ? `calc(env(safe-area-inset-bottom, 56px) + 72px)` : 16
-            bottom: !props.mobile ? 16 : props.isSafari ? "calc(env(safe-area-inset-bottom, 56px) + 144px)" : "calc(env(safe-area-inset-bottom, 56px) + 72px)"
+            // bottom: !props.mobile ? 16 : props.isSafari ? "calc(env(safe-area-inset-bottom, 56px) + 144px)" : "calc(env(safe-area-inset-bottom, 56px) + 72px)"
+            // bottom: props.mobile ? `calc(env(safe-area-inset-bottom, 56px) + 72px)` : 16,
+            top: "78%"
           }} onClick={handleChangeCommitted}>
           {
             loading ? <CircularProgress color="inherit" size={20} sx={{ mr: 1 }} /> : <DoneIcon sx={{ mr: 1 }} />
@@ -922,7 +1037,7 @@ const SettingItemSSIDList = (props) => {
 
   return (
     <SettingItem {...props}>
-      <Box sx={{ width: 200, maxWidth: "50%" }}>
+      <Box sx={{ width: 200, maxWidth: "70%" }}>
         <Autocomplete
           id={props.id}
           open={open}
@@ -982,6 +1097,7 @@ const UploadFilesItem = (props) => {
   const [loading, setLoading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false); //文件是否上传成功
   const [dialogContent, setDialogContent] = useState('');
+  const [cancelButton, setCancelButton] = useState(false);
   const handleSelectFile = (event) => {
     setUploadSuccess(false);
     const files = event.target.files;
@@ -1038,6 +1154,7 @@ const UploadFilesItem = (props) => {
           console.log('响应数据:', responseData);
           setUploadSuccess(true);
           setDialogContent("File upload successfully, Are you sure you want to reboot the device?");
+          setCancelButton(true);
         } else {
           let responseData = xhr.responseText;
           if (xhr.responseText.startsWith('{') && xhr.responseText.endsWith('}')) {
@@ -1070,10 +1187,16 @@ const UploadFilesItem = (props) => {
       return;
     };
     setLoading(true);
-    setDialogContent("The device is restarting. Please check the network status later.");
+    setDialogContent("Rebooting. Reconnect to WiFi if needed. Waiting for device connection");
+    setCancelButton(false);
     try {
       const response = await sendRequest('POST', '/restart');
       console.log('返回的的数据:', response);
+      const intervalId = setInterval(handleReconnectResponse, 5000);
+      // 网络发生变化时
+      window.addEventListener('online', () => {
+        handleReconnectResponse();
+      });
     } catch (error) {
       console.error('Error:', error);
     }
@@ -1112,7 +1235,7 @@ const UploadFilesItem = (props) => {
         onClose={handleClose}
         open={dialogShow}
         confirmButton={!progressShow}
-        cancelButton={!progressShow}
+        cancelButton={cancelButton}
         loading={loading}
         children={
           progressShow && <LinearProgressWithLabel value={progress} />
@@ -1193,12 +1316,13 @@ const DialogBox = (props) => {
           {
             props.confirmButton &&
             <Button onClick={props.onConfirm}>
-              {props.loading ? <CircularProgress color="inherit" size={20} /> : "Confirm"}
+              {props.loading ? <CircularProgress color="inherit" size={20} /> : props.confirmButtonContent ? props.confirmButtonContent : "Confirm"}
             </Button>
           }
           {
             props.cancelButton &&
-            <Button onClick={props.onClose} autoFocus>Close</Button>
+            // <Button onClick={props.onClose} autoFocus>Close</Button>
+            <Button onClick={props.onClose} autoFocus>{props.cancelButtonContent ? props.cancelButtonContent : "Close"}</Button>
           }
         </DialogActions>
       </Dialog>
@@ -1214,6 +1338,52 @@ const LinearProgressWithLabel = (props) => {
         <LinearProgress variant="determinate" {...props} />
       </Box>
     </Box>
+  );
+}
+
+const AlertStack = (props) => {
+  const stackRef = useRef(null);
+  useEffect(() => {
+    if (stackRef.current) {
+      const height = stackRef.current.clientHeight;
+      props.getStackHeightChange(height); // 将高度传回父组件
+    }
+  }, []); // 在内容或对话框状态变化时更新高度
+  return (
+    <>
+      <Stack sx={{ width: '100%', zIndex: 1210 }} spacing={2} ref={stackRef}>
+        <Alert
+          severity={props.severity}
+          action={
+            <>
+              <Button color="inherit" size="small" onClick={props.onAlertConfirm}>
+                {props.alertConfirmButtonContent}
+              </Button>
+              {
+                props.alertCloseButtonContent &&
+                <Button color="inherit" size="small" onClick={props.onAlertClose}>
+                  {props.alertCloseButtonContent}
+                </Button>
+              }
+            </>
+          }
+        >
+          {props.alertContent}
+        </Alert>
+      </Stack>
+      <DialogBox
+        open={props.alertDialogShow}
+        onConfirm={props.onAlertDialogConfirm}
+        onClose={props.onAlertDialogClose}
+        confirmButton={props.alertDialogConfirmButton}
+        cancelButton={props.alertDialogCancelButton}
+        title={props.alertDialogTitle}
+        content={props.alertDialogContent}
+        loading={props.alertDialogLoading}
+        confirmButtonContent="Reboot"
+        cancelButtonContent="Later"
+      />
+    </>
   );
 }
 
